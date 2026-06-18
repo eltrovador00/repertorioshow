@@ -10,7 +10,22 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts"
-
+import { auth, db } from "./firebase"
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "firebase/auth"
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc
+} from "firebase/firestore"
 import { DndContext, closestCenter } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -21,7 +36,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
-function MusicaArrastavel({ musica, textoExibicao, index, bloco, removerDoBloco }) {
+function MusicaArrastavel({ musica, textoExibicao, index, bloco, removerDoBloco, podeEditar }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({
       id: `${bloco.nome}|||${index}|||${musica}`
@@ -32,6 +47,14 @@ function MusicaArrastavel({ musica, textoExibicao, index, bloco, removerDoBloco 
     transition
   }
 
+  async function salvarRepertoriosFirebase(listaRepertorios = repertorios) {
+  if (!podeEditar) return
+
+  await setDoc(doc(db, "dados", "repertorios"), {
+    repertorios: listaRepertorios,
+    atualizadoEm: new Date().toISOString()
+  })
+}
   return (
     <div
       ref={setNodeRef}
@@ -61,23 +84,25 @@ function MusicaArrastavel({ musica, textoExibicao, index, bloco, removerDoBloco 
         <span>{textoExibicao || musica}</span>
       </div>
 
-      <button
-        onClick={() => removerDoBloco(bloco.nome, musica)}
-        style={{
-          width: "30px",
-          height: "30px",
-          background: "#ef4444",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-          fontSize: "16px",
-          fontWeight: "bold",
-          padding: 0
-        }}
-      >
-        ×
-      </button>
+      {podeEditar && (
+        <button
+          onClick={() => removerDoBloco(bloco.nome, musica)}
+          style={{
+            width: "30px",
+            height: "30px",
+            background: "#ef4444",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "16px",
+            fontWeight: "bold",
+            padding: 0
+          }}
+        >
+          ×
+        </button>
+      )}
     </div>
   )
 }
@@ -222,6 +247,21 @@ function App() {
   const [logoPersonalizada, setLogoPersonalizada] = useState(() => {
   return localStorage.getItem("logoPersonalizada") || ""
 })
+const [usuario, setUsuario] = useState(null)
+const [perfilUsuario, setPerfilUsuario] = useState(null)
+const podeEditar =
+  perfilUsuario?.permissao === "admin" ||
+  perfilUsuario?.permissao === "editor"
+
+const podeExcluir =
+  perfilUsuario?.permissao === "admin"
+
+const podeControlarPalco =
+  perfilUsuario?.permissao === "admin" ||
+  perfilUsuario?.permissao === "editor"
+const [emailLogin, setEmailLogin] = useState("")
+const [senhaLogin, setSenhaLogin] = useState("")
+const [carregandoLogin, setCarregandoLogin] = useState(true)
   const [modalEventoAberto, setModalEventoAberto] = useState(false)
 const [eventoEditando, setEventoEditando] = useState(null)
 const [nomeEventoEditando, setNomeEventoEditando] = useState("")
@@ -468,6 +508,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function adicionarMusicaAoBloco(nomeMusica) {
+    if (!podeEditar) return
     setBlocos(
       blocos.map((bloco) =>
         bloco.nome === blocoSelecionado
@@ -478,6 +519,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function excluirMusica(nomeMusica) {
+    if (!podeExcluir) return
     const confirmar = window.confirm(`Deseja excluir a música "${nomeMusica}"?`)
     if (!confirmar) return
 
@@ -502,6 +544,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function criarBloco() {
+    if (!podeEditar) return
     if (!novoBloco.trim()) return
 
     const cores = ["green", "blue", "orange", "purple", "red"]
@@ -519,6 +562,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function renomearBloco(nomeAtual) {
+    if (!podeEditar) return
     const blocoAtual = blocos.find((bloco) => bloco.nome === nomeAtual)
 
     setBlocoEditando(nomeAtual)
@@ -528,6 +572,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function salvarNovoNomeBloco() {
+    if (!podeEditar) return
     if (!novoNomeBloco.trim()) return
 
     setBlocos(
@@ -552,11 +597,13 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function excluirBloco(nomeBloco) {
+    if (!podeExcluir) return
     setItemExcluindo(nomeBloco)
     setModalExcluirAberto(true)
   }
 
   function confirmarExclusao() {
+    if (!podeExcluir) return
     const novosBlocos = blocos.filter((bloco) => bloco.nome !== itemExcluindo)
 
     setBlocos(novosBlocos)
@@ -570,6 +617,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function removerDoBloco(nomeBloco, nomeMusica) {
+    if (!podeEditar) return
     setBlocos(
       blocos.map((bloco) =>
         bloco.nome === nomeBloco
@@ -583,6 +631,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function criarRepertorio() {
+    if (!podeEditar) return
     if (!novoRepertorio.trim()) return
 
     const nome = novoRepertorio.trim()
@@ -608,6 +657,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function excluirRepertorio() {
+    if (!podeExcluir) return
     if (repertorios.length <= 1) {
       alert("Você precisa manter pelo menos um repertório.")
       return
@@ -631,11 +681,13 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function abrirEditarRepertorio() {
+    if (!podeEditar) return
     setNovoNomeRepertorio(repertorioAtual)
     setModalEditarRepertorioAberto(true)
   }
 
   function salvarNovoNomeRepertorio() {
+    if (!podeEditar) return
     if (!novoNomeRepertorio.trim()) return
 
     const nomeNovo = novoNomeRepertorio.trim()
@@ -661,6 +713,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function duplicarRepertorio() {
+    if (!podeEditar) return
     const repertorio = repertorios.find((rep) => rep.nome === repertorioAtual)
 
     if (!repertorio) return
@@ -686,6 +739,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function aoSoltar(event) {
+    if (!podeEditar) return
     const { active, over } = event
 
     if (!over || active.id === over.id) return
@@ -963,6 +1017,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function salvarMusica() {
+    if (!podeEditar) return
     if (!musicaEditando || !nomeMusicaEditando.trim()) return
 
     const nomeAntigo = musicaEditando.nome
@@ -1090,6 +1145,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function alternarFavorito(nomeMusica) {
+    if (!podeEditar) return
     setMusicas(
       musicas.map((musica) =>
         musica.nome === nomeMusica
@@ -1108,6 +1164,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }
 
   function registrarExecucaoRepertorio() {
+    if (!podeEditar) return
     const musicasExecutadas = blocos.flatMap((bloco) => bloco.musicas)
 
     if (musicasExecutadas.length === 0) {
@@ -1203,6 +1260,7 @@ useEffect(() => {
   localStorage.setItem("eventos", JSON.stringify(eventos))
 }, [eventos])
 function criarEvento() {
+  if (!podeEditar) return
   if (!nomeEvento.trim()) return
 
   const novoEvento = {
@@ -1222,6 +1280,7 @@ function criarEvento() {
   setLocalEvento("")
 }
 function excluirEvento(idEvento) {
+  if (!podeExcluir) return
   const confirmar = window.confirm("Deseja excluir este evento?")
 
   if (!confirmar) return
@@ -1229,6 +1288,7 @@ function excluirEvento(idEvento) {
   setEventos(eventos.filter((evento) => evento.id !== idEvento))
 }
 function abrirEditarEvento(evento) {
+  if (!podeEditar) return
   setEventoEditando(evento)
   setNomeEventoEditando(evento.nome)
   setDataEventoEditando(evento.data)
@@ -1239,6 +1299,7 @@ function abrirEditarEvento(evento) {
 }
 
 function salvarEventoEditado() {
+  if (!podeEditar) return
   if (!eventoEditando || !nomeEventoEditando.trim()) return
 
   setEventos(
@@ -1260,6 +1321,7 @@ function salvarEventoEditado() {
   setEventoEditando(null)
 }
 function finalizarEvento(evento) {
+  if (!podeEditar) return
   const confirmar = window.confirm(
     `Deseja finalizar o evento "${evento.nome}" e registrar as execuções?`
   )
@@ -1323,38 +1385,6 @@ function calcularTempoRestante(evento) {
   }
 
   const agora = new Date()
-
-  const dataEvento = new Date(
-    `${evento.data}T${evento.horario || "00:00"}`
-  )
-
-  const diferenca = dataEvento - agora
-
-  if (diferenca <= 0) {
-    return "⏳ Hoje"
-  }
-
-  const dias = Math.floor(
-    diferenca / (1000 * 60 * 60 * 24)
-  )
-
-  const horas = Math.floor(
-    (diferenca % (1000 * 60 * 60 * 24)) /
-      (1000 * 60 * 60)
-  )
-
-  return `${dias}d ${horas}h`
-}
-function calcularTempoRestante(evento) {
-  if (evento.finalizado) {
-    return "✔️ Realizado"
-  }
-
-  if (!evento.data) {
-    return "Sem data"
-  }
-
-  const agora = new Date()
   const dataEvento = new Date(`${evento.data}T${evento.horario || "00:00"}`)
   const diferenca = dataEvento - agora
 
@@ -1400,10 +1430,184 @@ function alterarLogo(event) {
 
   leitor.readAsDataURL(arquivo)
 }
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      setUsuario(user)
 
+      const refUsuario = doc(db, "usuarios", user.uid)
+      const snapUsuario = await getDoc(refUsuario)
 
+      if (snapUsuario.exists()) {
+        setPerfilUsuario(snapUsuario.data())
+      } else {
+        const novoPerfil = {
+          nome: user.email,
+          email: user.email,
+          permissao: "visualizador",
+          criadoEm: new Date().toISOString()
+        }
 
+        await setDoc(refUsuario, novoPerfil)
+        setPerfilUsuario(novoPerfil)
+      }
+    } else {
+      setUsuario(null)
+      setPerfilUsuario(null)
+    }
+
+    setCarregandoLogin(false)
+  })
+
+  return () => unsubscribe()
+}, [])
+
+useEffect(() => {
+  if (!usuario) return
+
+  const refMusicas = collection(db, "musicas")
+
+  const unsubscribe = onSnapshot(refMusicas, (snapshot) => {
+    const lista = snapshot.docs.map((docItem) => ({
+      id: docItem.id,
+      ...normalizarMusica(docItem.data())
+    }))
+
+    setMusicas(lista)
+  })
+
+  return () => unsubscribe()
+}, [usuario])
+
+async function criarMusicaFirebase() {
+  if (!podeEditar) {
+    alert("Você não possui permissão para adicionar músicas.")
+    return
+  }
+
+  if (!novaMusica.trim()) return
+
+  await addDoc(collection(db, "musicas"), {
+    nome: novaMusica.trim().toUpperCase(),
+    tom: "",
+    letra: "",
+    cifra: "",
+    tags: [],
+    favorito: false,
+    execucoes: 0,
+    criadoEm: new Date().toISOString()
+  })
+
+  setNovaMusica("")
+} 
+
+useEffect(() => {
+  if (!usuario) return
+
+  const ref = doc(db, "dados", "repertorios")
+
+  const unsubscribe = onSnapshot(ref, (snapshot) => {
+    if (snapshot.exists()) {
+      const dados = snapshot.data()
+
+      if (Array.isArray(dados.repertorios)) {
+        setRepertorios(dados.repertorios)
+
+        const atualExiste = dados.repertorios.some(
+          (rep) => rep.nome === repertorioAtual
+        )
+
+        const repertorioBase = atualExiste
+          ? dados.repertorios.find((rep) => rep.nome === repertorioAtual)
+          : dados.repertorios[0]
+
+        if (repertorioBase) {
+          setRepertorioAtual(repertorioBase.nome)
+          setBlocos(repertorioBase.blocos || [])
+        }
+      }
+    }
+  })
+
+  return () => unsubscribe()
+}, [usuario])
+async function salvarRepertoriosFirebase(listaRepertorios = repertorios) {
+  if (!podeEditar) {
+    alert("Você não possui permissão para sincronizar repertórios.")
+    return
+  }
+
+  await setDoc(doc(db, "dados", "repertorios"), {
+    repertorios: listaRepertorios,
+    atualizadoEm: new Date().toISOString()
+  })
+
+  alert("Repertórios sincronizados com sucesso!")
+}
+if (carregandoLogin) {
+  return <div className="login-page">Carregando...</div>
+}
+
+if (!usuario) {
   return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-header">
+          <div className="login-logo">🎵</div>
+
+          <h1 className="login-title">
+            Repertório Show
+          </h1>
+
+          <p className="login-subtitle">
+            Entre para acessar o sistema
+          </p>
+        </div>
+
+        <input
+          className="search"
+          placeholder="E-mail"
+          value={emailLogin}
+          onChange={(e) => setEmailLogin(e.target.value)}
+        />
+
+        <input
+          className="search"
+          type="password"
+          placeholder="Senha"
+          value={senhaLogin}
+          onChange={(e) => setSenhaLogin(e.target.value)}
+        />
+
+        <button className="btn-primary" onClick={entrarSistema}>
+          Entrar
+        </button>
+      </div>
+    </div>
+  )
+}
+async function entrarSistema() {
+  if (!emailLogin || !senhaLogin) {
+    alert("Digite e-mail e senha.")
+    return
+  }
+
+  try {
+    await signInWithEmailAndPassword(
+      auth,
+      emailLogin,
+      senhaLogin
+    )
+  } catch (error) {
+    alert("Erro ao entrar: " + error.message)
+  }
+}
+
+async function sairSistema() {
+  await signOut(auth)
+}
+  return (
+    
     <div className={temaEscuro ? "app dark" : "app"}>
       {modalConfiguracoesAberto && (
   <div className="modal-overlay">
@@ -1911,16 +2115,42 @@ function alterarLogo(event) {
         <div className="menu-item active">📋 Repertório</div>
         <div className="menu-item">🎶 Músicas</div>
         <div className="menu-item">📦 Blocos</div>
-        <div
-  className="menu-item"
-  onClick={() => setModalConfiguracoesAberto(true)}
->
-  ⚙️ Configurações
-</div>
+        {podeExcluir && (
+          <div
+            className="menu-item"
+            onClick={() => setModalConfiguracoesAberto(true)}
+          >
+            ⚙️ Configurações
+          </div>
+        )}
       </aside>
 
       <main className="content">
         <div className="topbar">
+          {podeEditar && (
+  <button
+    className="btn-light"
+    onClick={() => salvarRepertoriosFirebase()}
+  >
+    Sincronizar repertórios
+  </button>
+)}
+        <div
+          style={{
+            padding: "8px 12px",
+            background: "#1e293b",
+            color: "white",
+            borderRadius: "10px",
+            fontSize: "14px",
+            fontWeight: "bold"
+          }}
+        >
+          {perfilUsuario?.permissao?.toUpperCase()}
+        </div>
+
+        <button className="btn-light" onClick={sairSistema}>
+          Sair
+        </button>
           <button
             className="btn-light"
             onClick={() => setTemaEscuro(!temaEscuro)}
@@ -1936,9 +2166,11 @@ function alterarLogo(event) {
             Compartilhar
           </button>
 
-          <button className="btn-primary" onClick={registrarExecucaoRepertorio}>
-            Registrar execução
-          </button>
+          {podeEditar && (
+            <button className="btn-primary" onClick={registrarExecucaoRepertorio}>
+              Registrar execução
+            </button>
+          )}
 
           <button className="btn-light" onClick={exportarBackupJSON}>
             Backup JSON
@@ -2036,50 +2268,52 @@ function alterarLogo(event) {
 <div className="dashboard-card" style={{ marginBottom: "20px" }}>
   <h3>📅 Agenda de Eventos</h3>
 
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "2fr 1fr 1fr 2fr auto",
-      gap: "10px",
-      marginBottom: "15px"
-    }}
-  >
-    <input
-      className="search"
-      placeholder="Nome do evento"
-      value={nomeEvento}
-      onChange={(e) => setNomeEvento(e.target.value)}
-      style={{ margin: 0 }}
-    />
+  {podeEditar && (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "2fr 1fr 1fr 2fr auto",
+        gap: "10px",
+        marginBottom: "15px"
+      }}
+    >
+      <input
+        className="search"
+        placeholder="Nome do evento"
+        value={nomeEvento}
+        onChange={(e) => setNomeEvento(e.target.value)}
+        style={{ margin: 0 }}
+      />
 
-    <input
-      className="search"
-      type="date"
-      value={dataEvento}
-      onChange={(e) => setDataEvento(e.target.value)}
-      style={{ margin: 0 }}
-    />
+      <input
+        className="search"
+        type="date"
+        value={dataEvento}
+        onChange={(e) => setDataEvento(e.target.value)}
+        style={{ margin: 0 }}
+      />
 
-    <input
-      className="search"
-      type="time"
-      value={horarioEvento}
-      onChange={(e) => setHorarioEvento(e.target.value)}
-      style={{ margin: 0 }}
-    />
+      <input
+        className="search"
+        type="time"
+        value={horarioEvento}
+        onChange={(e) => setHorarioEvento(e.target.value)}
+        style={{ margin: 0 }}
+      />
 
-    <input
-      className="search"
-      placeholder="Local"
-      value={localEvento}
-      onChange={(e) => setLocalEvento(e.target.value)}
-      style={{ margin: 0 }}
-    />
+      <input
+        className="search"
+        placeholder="Local"
+        value={localEvento}
+        onChange={(e) => setLocalEvento(e.target.value)}
+        style={{ margin: 0 }}
+      />
 
-    <button className="btn-primary" onClick={criarEvento}>
-      +
-    </button>
-  </div>
+      <button className="btn-primary" onClick={criarEvento}>
+        +
+      </button>
+    </div>
+  )}
 
   {eventos.length === 0 ? (
     <p>Nenhum evento cadastrado.</p>
@@ -2112,34 +2346,41 @@ function alterarLogo(event) {
 >
   ⏳ {calcularTempoRestante(evento)}
 </span>
-        <button
-  className="btn-light"
-  onClick={() => finalizarEvento(evento)}
-  style={{
-    background: evento.finalizado ? "#16a34a" : "#dcfce7",
-    color: evento.finalizado ? "white" : "#166534",
-    fontWeight: "bold"
-  }}
->
-  {evento.finalizado ? "Finalizado" : "✔️ Finalizar"}
-</button>
-        <button
-  className="btn-light"
-  onClick={() => abrirEditarEvento(evento)}
->
-  ✏️
-</button>
-<button
-  className="btn-light"
-  onClick={() => excluirEvento(evento.id)}
-  style={{
-    background: "#ef4444",
-    color: "white"
-  }}
->
-  
-  🗑️
-</button>
+        {podeEditar && (
+          <button
+            className="btn-light"
+            onClick={() => finalizarEvento(evento)}
+            style={{
+              background: evento.finalizado ? "#16a34a" : "#dcfce7",
+              color: evento.finalizado ? "white" : "#166534",
+              fontWeight: "bold"
+            }}
+          >
+            {evento.finalizado ? "Finalizado" : "✔️ Finalizar"}
+          </button>
+        )}
+
+        {podeEditar && (
+          <button
+            className="btn-light"
+            onClick={() => abrirEditarEvento(evento)}
+          >
+            ✏️
+          </button>
+        )}
+
+        {podeExcluir && (
+          <button
+            className="btn-light"
+            onClick={() => excluirEvento(evento.id)}
+            style={{
+              background: "#ef4444",
+              color: "white"
+            }}
+          >
+            🗑️
+          </button>
+        )}
 
        <button
   className="btn-light"
@@ -2199,37 +2440,22 @@ function alterarLogo(event) {
 </div>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-              <input
-                className="search"
-                placeholder="Digite o nome da nova música"
-                value={novaMusica}
-                onChange={(e) => setNovaMusica(e.target.value)}
-                style={{ margin: 0 }}
-              />
+  <input
+    className="search"
+    placeholder="Digite o nome da nova música"
+    value={novaMusica}
+    onChange={(e) => setNovaMusica(e.target.value)}
+    style={{ margin: 0 }}
+  />
 
-              <button
-                className="btn-primary"
-                onClick={() => {
-                  if (novaMusica.trim() !== "") {
-                    setMusicas([
-                      ...musicas,
-                      {
-                        nome: novaMusica.trim().toUpperCase(),
-                        tom: "",
-                        letra: "",
-                        cifra: "",
-                        tags: [],
-                        favorito: false,
-                        execucoes: 0
-                      }
-                    ])
-                    setNovaMusica("")
-                  }
-                }}
-              >
-                +
-              </button>
-            </div>
+  <button
+    className="btn-primary"
+    onClick={criarMusicaFirebase}
+  >
+    +
+  </button>
+              </div>
+          
 
             <select
               className="search"
@@ -2279,42 +2505,47 @@ function alterarLogo(event) {
   )}
 </div>  
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    className="add-btn"
-                    onClick={() => adicionarMusicaAoBloco(musica.nome)}
-                  >
-                    +
-                  </button>
+                  {podeEditar && (
+                    <button
+                      className="add-btn"
+                      onClick={() => adicionarMusicaAoBloco(musica.nome)}
+                    >
+                      +
+                    </button>
+                  )}
 
-                  <button
-                    onClick={() => alternarFavorito(musica.nome)}
-                    style={{
-                      background: musica.favorito ? "#facc15" : "#f1f5f9",
-                      color: "#111827",
-                      border: "none",
-                      borderRadius: "10px",
-                      width: "40px",
-                      height: "40px",
-                      cursor: "pointer"
-                    }}
-                  >
-                    ⭐
-                  </button>
-
+                  {podeEditar && (
+                    <button
+                      onClick={() => alternarFavorito(musica.nome)}
+                      style={{
+                        background: musica.favorito ? "#facc15" : "#f1f5f9",
+                        color: "#111827",
+                        border: "none",
+                        borderRadius: "10px",
+                        width: "40px",
+                        height: "40px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      ⭐
+                    </button>
+                  )}
+                  {podeEditar && (
                   <button
                     onClick={() => editarMusica(musica)}
                     style={{
-                      background: "#e5e7eb",
-                      color: "#111827",
-                      border: "none",
-                      borderRadius: "10px",
-                      width: "40px",
-                      height: "40px",
-                      cursor: "pointer"
+                       background: "#e5e7eb",
+      color: "#111827",
+      border: "none",
+      borderRadius: "10px",
+      width: "40px",
+      height: "40px",
+      cursor: "pointer"
                     }}
                   >
                     ✏️
                   </button>
+                  )}
 
                   <button
                     onClick={() => visualizarLetra(musica)}
@@ -2330,13 +2561,14 @@ function alterarLogo(event) {
                   >
                     👁️
                   </button>
-
-                  <button
-                    className="delete-btn"
-                    onClick={() => excluirMusica(musica.nome)}
-                  >
-                    🗑️
-                  </button>
+          {podeExcluir && (
+  <button
+    className="delete-btn"
+    onClick={() => excluirMusica(musica.nome)}
+  >
+    🗑️
+  </button>
+)}
                 </div>
               </div>
             ))}
@@ -2374,89 +2606,99 @@ function alterarLogo(event) {
                   ))}
                 </select>
 
-                <button
-                  onClick={duplicarRepertorio}
-                  style={{
-                    background: "#dbeafe",
-                    color: "#1e40af",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "0 14px",
-                    cursor: "pointer",
-                    fontWeight: "bold"
-                  }}
-                >
-                  📄
-                </button>
+                {podeEditar && (
+                  <button
+                    onClick={duplicarRepertorio}
+                    style={{
+                      background: "#dbeafe",
+                      color: "#1e40af",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "0 14px",
+                      cursor: "pointer",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    📄
+                  </button>
+                )}
 
-                <button
-                  onClick={abrirEditarRepertorio}
-                  style={{
-                    background: "#e5e7eb",
-                    color: "#111827",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "0 14px",
-                    cursor: "pointer",
-                    fontWeight: "bold"
-                  }}
-                >
-                  ✏️
-                </button>
+                {podeEditar && (
+                  <button
+                    onClick={abrirEditarRepertorio}
+                    style={{
+                      background: "#e5e7eb",
+                      color: "#111827",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "0 14px",
+                      cursor: "pointer",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    ✏️
+                  </button>
+                )}
 
-                <button
-                  onClick={excluirRepertorio}
-                  style={{
-                    background: "#ef4444",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "0 14px",
-                    cursor: "pointer",
-                    fontWeight: "bold"
-                  }}
-                >
-                  🗑️
-                </button>
+                {podeExcluir && (
+                  <button
+                    onClick={excluirRepertorio}
+                    style={{
+                      background: "#ef4444",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "0 14px",
+                      cursor: "pointer",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    🗑️
+                  </button>
+                )}
               </div>
 
-              <div style={{ display: "flex", gap: "10px" }}>
-                <input
-                  className="search"
-                  placeholder="Novo repertório"
-                  value={novoRepertorio}
-                  onChange={(e) => setNovoRepertorio(e.target.value)}
-                  style={{
-                    flex: 1,
-                    margin: 0
-                  }}
-                />
+              {podeEditar && (
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <input
+                    className="search"
+                    placeholder="Novo repertório"
+                    value={novoRepertorio}
+                    onChange={(e) => setNovoRepertorio(e.target.value)}
+                    style={{
+                      flex: 1,
+                      margin: 0
+                    }}
+                  />
 
-                <button className="btn-primary" onClick={criarRepertorio}>
-                  +
-                </button>
-              </div>
+                  <button className="btn-primary" onClick={criarRepertorio}>
+                    +
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="card-header">
               <h2>Repertório do Show</h2>
 
-              <div style={{ display: "flex", gap: "8px" }}>
-                <input
-                  placeholder="Novo bloco"
-                  value={novoBloco}
-                  onChange={(e) => setNovoBloco(e.target.value)}
-                  style={{
-                    padding: "10px",
-                    borderRadius: "8px",
-                    border: "1px solid #ddd"
-                  }}
-                />
+              {podeEditar && (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    placeholder="Novo bloco"
+                    value={novoBloco}
+                    onChange={(e) => setNovoBloco(e.target.value)}
+                    style={{
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #ddd"
+                    }}
+                  />
 
-                <button className="btn-light" onClick={criarBloco}>
-                  +
-                </button>
-              </div>
+                  <button className="btn-light" onClick={criarBloco}>
+                    +
+                  </button>
+                </div>
+              )}
             </div>
 
             <DndContext collisionDetection={closestCenter} onDragEnd={aoSoltar}>
@@ -2488,35 +2730,39 @@ function alterarLogo(event) {
 
                             {index + 1}. {bloco.nome}
 
-                            <button
-                              onClick={() => renomearBloco(bloco.nome)}
-                              style={{
-                                marginLeft: "10px",
-                                background: "#e5e7eb",
-                                color: "#111827",
-                                border: "none",
-                                borderRadius: "6px",
-                                padding: "4px 8px",
-                                cursor: "pointer"
-                              }}
-                            >
-                              editar
-                            </button>
+                            {podeEditar && (
+                              <button
+                                onClick={() => renomearBloco(bloco.nome)}
+                                style={{
+                                  marginLeft: "10px",
+                                  background: "#e5e7eb",
+                                  color: "#111827",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  padding: "4px 8px",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                editar
+                              </button>
+                            )}
 
-                            <button
-                              onClick={() => excluirBloco(bloco.nome)}
-                              style={{
-                                marginLeft: "6px",
-                                background: "#ef4444",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                padding: "4px 8px",
-                                cursor: "pointer"
-                              }}
-                            >
-                              excluir
-                            </button>
+                            {podeExcluir && (
+                              <button
+                                onClick={() => excluirBloco(bloco.nome)}
+                                style={{
+                                  marginLeft: "6px",
+                                  background: "#ef4444",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  padding: "4px 8px",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                excluir
+                              </button>
+                            )}
                           </div>
 
                           <div className="block-count">
@@ -2539,6 +2785,7 @@ function alterarLogo(event) {
                               index={index}
                               bloco={bloco}
                               removerDoBloco={removerDoBloco}
+                              podeEditar={podeEditar}
                             />
                           ))}
                         </SortableContext>

@@ -950,3 +950,73 @@ body.stage-open {
     font-size: 24px;
   }
 }
+
+.login-page {
+  min-height: 100vh;
+  background: #020617;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 450px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 24px;
+  padding: 40px;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 0 30px rgba(124, 58, 237, 0.15),
+    0 20px 60px rgba(0, 0, 0, 0.4);
+}
+..login-card h1 {
+  font-size: 2.4rem;
+  margin-bottom: 10px;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.login-card p {
+  color: #94a3b8;
+  margin-bottom: 20px;
+}
+
+.login-card .search {
+  margin-bottom: 12px;
+}
+
+.login-card .btn-primary {
+  width: 100%;
+}
+
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.login-logo {
+  font-size: 5rem;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.login-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-align: center;
+}
+
+.login-subtitle {
+  margin-top: 10px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 1rem;
+}
