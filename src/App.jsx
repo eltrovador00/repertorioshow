@@ -1634,15 +1634,18 @@ useEffect(() => {
 useEffect(() => {
   if (!modoPalcoAberto || !sessaoPalco?.ativo) return
 
-  const nomesMusicas = sessaoPalco.musicas || []
   const indice = sessaoPalco.indiceMusica || 0
 
-  const lista = nomesMusicas.map((nomeMusica) => {
-    const dadosMusica = musicas.find((m) => m.nome === nomeMusica)
+  const lista = (sessaoPalco.musicas || []).map((itemMusica) => {
+    if (typeof itemMusica === "object" && itemMusica !== null) {
+      return normalizarMusica(itemMusica)
+    }
+
+    const dadosMusica = musicas.find((m) => m.nome === itemMusica)
 
     return (
       dadosMusica || {
-        nome: nomeMusica,
+        nome: itemMusica,
         tom: "",
         letra: "",
         cifra: "",
@@ -1662,12 +1665,6 @@ useEffect(() => {
 }, [sessaoPalco, modoPalcoAberto, musicas])
 
 async function iniciarSessaoPalco() {
-  if (!podeControlarPalco) {
-    alert("Você não possui permissão para controlar o palco.")
-    return
-  }
-
- async function iniciarSessaoPalco() {
   if (!podeControlarPalco) {
     alert("Você não possui permissão para controlar o palco.")
     return
@@ -1706,7 +1703,6 @@ async function iniciarSessaoPalco() {
   })
 
   alert("Sessão de palco iniciada.")
-}
 }
 
 if (carregandoLogin) {
@@ -1780,24 +1776,35 @@ function entrarNaSessaoAoVivo() {
     return
   }
 
-  const lista = sessaoPalco.musicas || []
+  const lista = (sessaoPalco.musicas || []).map((itemMusica) => {
+    if (typeof itemMusica === "object" && itemMusica !== null) {
+      return normalizarMusica(itemMusica)
+    }
+
+    const dadosMusica = musicas.find((m) => m.nome === itemMusica)
+
+    return (
+      dadosMusica || {
+        nome: itemMusica,
+        tom: "",
+        letra: "",
+        cifra: "",
+        tags: [],
+        favorito: false,
+        execucoes: 0
+      }
+    )
+  })
+
   const indice = sessaoPalco.indiceMusica || 0
 
   setListaPalco(lista)
   setIndiceMusicaPalco(indice)
-  setMusicaPalco(lista[indice])
+  setMusicaPalco(lista[indice] || lista[0])
   setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
   setModoPalcoAberto(true)
 }
 
-  const indice = sessaoPalco.indiceMusica || 0
-
-  setListaPalco(lista)
-  setIndiceMusicaPalco(indice)
-  setMusicaPalco(lista[indice])
-  setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
-  setModoPalcoAberto(true)
-}
 async function atualizarSessaoPalco(novosDados) {
   if (!podeControlarPalco) return
 
