@@ -47,14 +47,6 @@ function MusicaArrastavel({ musica, textoExibicao, index, bloco, removerDoBloco,
     transition
   }
 
-  async function salvarRepertoriosFirebase(listaRepertorios = repertorios) {
-  if (!podeEditar) return
-
-  await setDoc(doc(db, "dados", "repertorios"), {
-    repertorios: listaRepertorios,
-    atualizadoEm: new Date().toISOString()
-  })
-}
   return (
     <div
       ref={setNodeRef}
@@ -271,7 +263,8 @@ const [localEventoEditando, setLocalEventoEditando] = useState("")
 const [repertorioEventoEditando, setRepertorioEventoEditando] = useState("")
   const [indiceMusicaPalco, setIndiceMusicaPalco] = useState(0)
   const [listaPalco, setListaPalco] = useState([])
-
+const [sessaoPalco, setSessaoPalco] = useState(null)
+const [mensagemHost, setMensagemHost] = useState("")
   const [modalEditarAberto, setModalEditarAberto] = useState(false)
   const [modalEditarRepertorioAberto, setModalEditarRepertorioAberto] =
     useState(false)
@@ -507,15 +500,64 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
     return tom ? `${nomeMusica} (${tom})` : nomeMusica
   }
 
-  function adicionarMusicaAoBloco(nomeMusica) {
-    if (!podeEditar) return
-    setBlocos(
-      blocos.map((bloco) =>
-        bloco.nome === blocoSelecionado
-          ? { ...bloco, musicas: [...bloco.musicas, nomeMusica] }
-          : bloco
-      )
+  async function adicionarMusicaAoBloco(nomeMusica) {
+    if (!podeEditar) {
+      alert("Você não possui permissão para editar repertórios.")
+      return
+    }
+
+    if (!nomeMusica) {
+      alert("Música inválida.")
+      return
+    }
+
+    if (!Array.isArray(blocos) || blocos.length === 0) {
+      alert("Crie um bloco antes de adicionar músicas.")
+      return
+    }
+
+    const nomeBlocoDestino =
+      blocoSelecionado && blocos.some((bloco) => bloco.nome === blocoSelecionado)
+        ? blocoSelecionado
+        : blocos[0].nome
+
+    if (nomeBlocoDestino !== blocoSelecionado) {
+      setBlocoSelecionado(nomeBlocoDestino)
+    }
+
+    const novosBlocos = blocos.map((bloco) => {
+      const musicasDoBloco = Array.isArray(bloco.musicas)
+        ? bloco.musicas
+        : []
+
+      if (bloco.nome !== nomeBlocoDestino) {
+        return {
+          ...bloco,
+          musicas: musicasDoBloco
+        }
+      }
+
+      return {
+        ...bloco,
+        musicas: musicasDoBloco.includes(nomeMusica)
+          ? musicasDoBloco
+          : [...musicasDoBloco, nomeMusica]
+      }
+    })
+
+    const novosRepertorios = repertorios.map((rep) =>
+      rep.nome === repertorioAtual
+        ? {
+            ...rep,
+            blocos: novosBlocos
+          }
+        : rep
     )
+
+    setBlocos(novosBlocos)
+    setRepertorios(novosRepertorios)
+
+    await salvarRepertoriosFirebase(novosRepertorios)
   }
 
   function excluirMusica(nomeMusica) {
@@ -543,22 +585,35 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
     )
   }
 
-  function criarBloco() {
+  async function criarBloco() {
     if (!podeEditar) return
     if (!novoBloco.trim()) return
 
     const cores = ["green", "blue", "orange", "purple", "red"]
 
-    setBlocos([
+    const novosBlocos = [
       ...blocos,
       {
         nome: novoBloco.trim(),
         cor: cores[blocos.length % cores.length],
         musicas: []
       }
-    ])
+    ]
 
+    const novosRepertorios = repertorios.map((rep) =>
+      rep.nome === repertorioAtual
+        ? {
+            ...rep,
+            blocos: novosBlocos
+          }
+        : rep
+    )
+
+    setBlocos(novosBlocos)
+    setRepertorios(novosRepertorios)
     setNovoBloco("")
+
+    await salvarRepertoriosFirebase(novosRepertorios)
   }
 
   function renomearBloco(nomeAtual) {
@@ -616,18 +671,34 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
     setItemExcluindo("")
   }
 
-  function removerDoBloco(nomeBloco, nomeMusica) {
+  async function removerDoBloco(nomeBloco, nomeMusica) {
     if (!podeEditar) return
-    setBlocos(
-      blocos.map((bloco) =>
-        bloco.nome === nomeBloco
-          ? {
-              ...bloco,
-              musicas: bloco.musicas.filter((musica) => musica !== nomeMusica)
-            }
-          : bloco
-      )
+
+    const novosBlocos = blocos.map((bloco) =>
+      bloco.nome === nomeBloco
+        ? {
+            ...bloco,
+            musicas: (bloco.musicas || []).filter((musica) => musica !== nomeMusica)
+          }
+        : {
+            ...bloco,
+            musicas: Array.isArray(bloco.musicas) ? bloco.musicas : []
+          }
     )
+
+    const novosRepertorios = repertorios.map((rep) =>
+      rep.nome === repertorioAtual
+        ? {
+            ...rep,
+            blocos: novosBlocos
+          }
+        : rep
+    )
+
+    setBlocos(novosBlocos)
+    setRepertorios(novosRepertorios)
+
+    await salvarRepertoriosFirebase(novosRepertorios)
   }
 
   function criarRepertorio() {
@@ -1223,7 +1294,7 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
 
   return correspondeBusca && correspondeTag
 })
-const totalFavoritas = musicas.filter((musica) => musica.favorita).length
+const totalFavoritas = musicas.filter((musica) => musica.favorito).length
 
 const totalExecucoes = historicoExecucoes.length
 
@@ -1541,9 +1612,82 @@ async function salvarRepertoriosFirebase(listaRepertorios = repertorios) {
     repertorios: listaRepertorios,
     atualizadoEm: new Date().toISOString()
   })
-
-  alert("Repertórios sincronizados com sucesso!")
 }
+
+
+
+
+useEffect(() => {
+  if (!usuario) return
+
+  const ref = doc(db, "palco", "sessaoAtual")
+
+  const unsubscribe = onSnapshot(ref, (snapshot) => {
+    if (snapshot.exists()) {
+      setSessaoPalco(snapshot.data())
+    }
+  })
+
+  return () => unsubscribe()
+}, [usuario])
+
+useEffect(() => {
+  if (!modoPalcoAberto || !sessaoPalco?.ativo) return
+
+  const nomesMusicas = sessaoPalco.musicas || []
+  const indice = sessaoPalco.indiceMusica || 0
+
+  const lista = nomesMusicas.map((nomeMusica) => {
+    const dadosMusica = musicas.find((m) => m.nome === nomeMusica)
+
+    return (
+      dadosMusica || {
+        nome: nomeMusica,
+        tom: "",
+        letra: "",
+        cifra: "",
+        tags: [],
+        favorito: false,
+        execucoes: 0
+      }
+    )
+  })
+
+  if (lista.length === 0) return
+
+  setListaPalco(lista)
+  setIndiceMusicaPalco(indice)
+  setMusicaPalco(lista[indice] || lista[0])
+  setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
+}, [sessaoPalco, modoPalcoAberto, musicas])
+
+async function iniciarSessaoPalco() {
+  if (!podeControlarPalco) {
+    alert("Você não possui permissão para controlar o palco.")
+    return
+  }
+
+  const musicasDoRepertorio = blocos.flatMap((bloco) => bloco.musicas)
+
+  if (musicasDoRepertorio.length === 0) {
+    alert("Este repertório não possui músicas.")
+    return
+  }
+
+  await setDoc(doc(db, "palco", "sessaoAtual"), {
+    repertorio: repertorioAtual,
+    musicas: musicasDoRepertorio,
+    indiceMusica: 0,
+    modo: "letra",
+    mensagemHost: "",
+    host: perfilUsuario?.nome || usuario.email,
+    ativo: true,
+    atualizadoEm: new Date().toISOString()
+  })
+
+  alert("Sessão de palco iniciada.")
+}
+
 if (carregandoLogin) {
   return <div className="login-page">Carregando...</div>
 }
@@ -1586,6 +1730,8 @@ if (!usuario) {
     </div>
   )
 }
+
+
 async function entrarSistema() {
   if (!emailLogin || !senhaLogin) {
     alert("Digite e-mail e senha.")
@@ -1606,6 +1752,42 @@ async function entrarSistema() {
 async function sairSistema() {
   await signOut(auth)
 }
+
+function entrarNaSessaoAoVivo() {
+  if (!sessaoPalco?.ativo) {
+    alert("Nenhuma sessão de palco ativa.")
+    return
+  }
+
+  const nomesMusicas = sessaoPalco.musicas || []
+
+  const lista = nomesMusicas.map((nomeMusica) => {
+    const dadosMusica = musicas.find((m) => m.nome === nomeMusica)
+
+    return (
+      dadosMusica || {
+        nome: nomeMusica,
+        tom: "",
+        letra: "",
+        cifra: "",
+        tags: [],
+        favorito: false,
+        execucoes: 0
+      }
+    )
+  })
+
+  const indice = sessaoPalco.indiceMusica || 0
+
+  setListaPalco(lista)
+  setIndiceMusicaPalco(indice)
+  setMusicaPalco(lista[indice])
+  setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
+  setModoPalcoAberto(true)
+}
+
+
+
   return (
     
     <div className={temaEscuro ? "app dark" : "app"}>
@@ -2127,6 +2309,16 @@ async function sairSistema() {
 
       <main className="content">
         <div className="topbar">
+          {podeControlarPalco && (
+  <button className="btn-primary" onClick={iniciarSessaoPalco}>
+    🎤 Iniciar palco ao vivo
+  </button>
+)}
+{sessaoPalco?.ativo && (
+  <button className="btn-light" onClick={entrarNaSessaoAoVivo}>
+    👥 Entrar no palco ao vivo
+  </button>
+)}
           {podeEditar && (
   <button
     className="btn-light"
