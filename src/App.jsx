@@ -428,21 +428,23 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
   }, [modoPalcoAberto])
 
   useEffect(() => {
-    if (!modoPalcoAberto || !rolagemAtiva) return
+  if (!modoPalcoAberto) return
+  if (!rolagemAtiva) return
 
-    const intervalo = setInterval(() => {
-      const palco = document.querySelector(".stage-mode")
+  const palco = document.querySelector(".stage-mode")
 
-      if (palco) {
-        palco.scrollBy({
-          top: velocidadeRolagem,
-          behavior: "smooth"
-        })
-      }
-    }, 30)
+  if (!palco) return
 
-    return () => clearInterval(intervalo)
-  }, [rolagemAtiva, velocidadeRolagem, modoPalcoAberto])
+  const intervalo = setInterval(() => {
+    palco.scrollTop += velocidadeRolagem
+  }, 30)
+
+  return () => clearInterval(intervalo)
+}, [
+  rolagemAtiva,
+  velocidadeRolagem,
+  modoPalcoAberto
+])
 
   useEffect(() => {
     if (!modoPalcoAberto) return
@@ -450,16 +452,35 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
     function controlarTeclas(event) {
       switch (event.key) {
         case "ArrowRight":
-          proximaMusicaPalco()
+          if (sessaoPalco?.ativo && podeControlarPalco) {
+            proximaMusicaAoVivo()
+          } else {
+            proximaMusicaPalco()
+          }
           break
 
         case "ArrowLeft":
-          musicaAnteriorPalco()
+          if (sessaoPalco?.ativo && podeControlarPalco) {
+            musicaAnteriorAoVivo()
+          } else {
+            musicaAnteriorPalco()
+          }
           break
 
         case " ":
           event.preventDefault()
-          setRolagemAtiva((estado) => !estado)
+          setRolagemAtiva((estado) => {
+            const novoEstado = !estado
+
+            if (podeControlarPalco && sessaoPalco?.ativo) {
+              atualizarSessaoPalco({
+                rolagemAtiva: novoEstado,
+                velocidadeRolagem
+              })
+            }
+
+            return novoEstado
+          })
           break
 
         case "Escape":
@@ -468,11 +489,31 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
 
         case "+":
         case "=":
-          setVelocidadeRolagem((v) => v + 1)
+          setVelocidadeRolagem((v) => {
+            const novaVelocidade = v + 1
+
+            if (podeControlarPalco && sessaoPalco?.ativo) {
+              atualizarSessaoPalco({
+                velocidadeRolagem: novaVelocidade
+              })
+            }
+
+            return novaVelocidade
+          })
           break
 
         case "-":
-          setVelocidadeRolagem((v) => Math.max(1, v - 1))
+          setVelocidadeRolagem((v) => {
+            const novaVelocidade = Math.max(1, v - 1)
+
+            if (podeControlarPalco && sessaoPalco?.ativo) {
+              atualizarSessaoPalco({
+                velocidadeRolagem: novaVelocidade
+              })
+            }
+
+            return novaVelocidade
+          })
           break
 
         default:
@@ -485,7 +526,14 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
     return () => {
       window.removeEventListener("keydown", controlarTeclas)
     }
-  }, [modoPalcoAberto, indiceMusicaPalco, listaPalco])
+  }, [
+    modoPalcoAberto,
+    indiceMusicaPalco,
+    listaPalco,
+    sessaoPalco,
+    podeControlarPalco,
+    velocidadeRolagem
+  ])
 
   function pegarMusica(nomeMusica) {
     return musicas.find((musica) => musica.nome === nomeMusica)
@@ -1697,6 +1745,8 @@ async function iniciarSessaoPalco() {
     indiceMusica: 0,
     modo: "letra",
     mensagemHost: "",
+    rolagemAtiva: false,
+    velocidadeRolagem: velocidadeRolagem || 1,
     host: perfilUsuario?.nome || usuario.email,
     ativo: true,
     atualizadoEm: new Date().toISOString()
@@ -1704,6 +1754,15 @@ async function iniciarSessaoPalco() {
 
   alert("Sessão de palco iniciada.")
 }
+
+useEffect(() => {
+  if (!modoPalcoAberto || !sessaoPalco?.ativo) return
+
+  setRolagemAtiva(Boolean(sessaoPalco.rolagemAtiva))
+  setVelocidadeRolagem(sessaoPalco.velocidadeRolagem || 1)
+}, [sessaoPalco, modoPalcoAberto])
+
+
 
 if (carregandoLogin) {
   return <div className="login-page">Carregando...</div>
@@ -1811,7 +1870,6 @@ async function atualizarSessaoPalco(novosDados) {
   await setDoc(
     doc(db, "palco", "sessaoAtual"),
     {
-      ...sessaoPalco,
       ...novosDados,
       atualizadoEm: new Date().toISOString()
     },
@@ -1852,8 +1910,10 @@ async function musicaAnteriorAoVivo() {
 }
 
 async function enviarMensagemHost() {
+  if (!mensagemHost.trim()) return
+
   await atualizarSessaoPalco({
-    mensagemHost
+    mensagemHost: mensagemHost.trim()
   })
 }
 
@@ -1948,6 +2008,12 @@ async function limparMensagemHost() {
           </button>
 
           <div className="stage-content">
+            {sessaoPalco?.mensagemHost && (
+              <div className="stage-host-message">
+                {sessaoPalco.mensagemHost}
+              </div>
+            )}
+
             <h1>{musicaPalco.nome}</h1>
 
             {musicaPalco.tom && <h2>Tom: {musicaPalco.tom}</h2>}
@@ -1973,49 +2039,92 @@ async function limparMensagemHost() {
             </pre>
 
             <div className="stage-controls">
-              <button onClick={() => setRolagemAtiva(!rolagemAtiva)}>
-                {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
-              </button>
+              <button
+  onClick={() => {
+    const novoEstado = !rolagemAtiva
+
+    setRolagemAtiva(novoEstado)
+
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+      atualizarSessaoPalco({
+        rolagemAtiva: novoEstado,
+        velocidadeRolagem
+      })
+    }
+  }}
+>
+  {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
+</button>
 
               <button
-                onClick={() =>
-                  setVelocidadeRolagem(Math.max(1, velocidadeRolagem - 1))
-                }
-              >
-                ➖
-              </button>
+  onClick={() => {
+    const novaVelocidade = Math.max(1, velocidadeRolagem - 1)
 
-              <span>Velocidade: {velocidadeRolagem}</span>
+    setVelocidadeRolagem(novaVelocidade)
 
-              <button
-                onClick={() => setVelocidadeRolagem(velocidadeRolagem + 1)}
-              >
-                ➕
-              </button>
-            </div>
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+      atualizarSessaoPalco({
+        velocidadeRolagem: novaVelocidade
+      })
+    }
+  }}
+>
+  ➖
+</button>
 
-            <div className="stage-shortcuts">
-              ⬅️ Anterior | ➡️ Próxima | Espaço = Pausar | + = Mais rápido | - =
-              Mais lento | Esc = Fechar
-            </div>
+<span>Velocidade: {velocidadeRolagem}</span>
 
-            <div className="stage-navigation">
-              <button onClick={musicaAnteriorPalco}>◀ Anterior</button>
+<button
+  onClick={() => {
+    const novaVelocidade = velocidadeRolagem + 1
 
-              <span>
-                {indiceMusicaPalco + 1} / {listaPalco.length}
-              </span>
+    setVelocidadeRolagem(novaVelocidade)
 
-              <button onClick={proximaMusicaPalco}>Próxima ▶</button>
-            </div>
-            {podeControlarPalco && sessaoPalco?.ativo && (
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+      atualizarSessaoPalco({
+        velocidadeRolagem: novaVelocidade
+      })
+    }
+  }}
+>
+  ➕
+</button>
+           </div>
+
+<div className="stage-shortcuts">
+  ⬅️ Anterior | ➡️ Próxima | Espaço = Pausar | + = Mais rápido | - =
+  Mais lento | Esc = Fechar
+</div>
+
+<div className="stage-navigation">
+  <button
+    onClick={() =>
+      sessaoPalco?.ativo
+        ? musicaAnteriorAoVivo()
+        : musicaAnteriorPalco()
+    }
+  >
+    ◀ Anterior
+  </button>
+
+  <span>
+    {indiceMusicaPalco + 1} / {listaPalco.length}
+  </span>
+
+  <button
+    onClick={() =>
+      sessaoPalco?.ativo
+        ? proximaMusicaAoVivo()
+        : proximaMusicaPalco()
+    }
+  >
+    Próxima ▶
+  </button>
+</div>
+
+{podeControlarPalco && sessaoPalco?.ativo && (
   <div className="stage-host-panel">
     <h3>🎛 Controle do Host</h3>
-
-    <div className="stage-navigation">
-      <button onClick={musicaAnteriorAoVivo}>◀ Ao vivo</button>
-      <button onClick={proximaMusicaAoVivo}>Ao vivo ▶</button>
-    </div>
 
     <div className="stage-message-box">
       <input
@@ -2032,12 +2141,6 @@ async function limparMensagemHost() {
         Limpar
       </button>
     </div>
-  </div>
-)}
-
-{sessaoPalco?.mensagemHost && (
-  <div className="stage-host-message">
-    {sessaoPalco.mensagemHost}
   </div>
 )}
 
