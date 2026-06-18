@@ -1667,7 +1667,27 @@ async function iniciarSessaoPalco() {
     return
   }
 
-  const musicasDoRepertorio = blocos.flatMap((bloco) => bloco.musicas)
+ async function iniciarSessaoPalco() {
+  if (!podeControlarPalco) {
+    alert("Você não possui permissão para controlar o palco.")
+    return
+  }
+
+  const musicasDoRepertorio = blocos
+    .flatMap((bloco) => bloco.musicas || [])
+    .map((nomeMusica) => {
+      const dadosMusica = musicas.find((m) => m.nome === nomeMusica)
+
+      return dadosMusica || {
+        nome: nomeMusica,
+        tom: "",
+        letra: "",
+        cifra: "",
+        tags: [],
+        favorito: false,
+        execucoes: 0
+      }
+    })
 
   if (musicasDoRepertorio.length === 0) {
     alert("Este repertório não possui músicas.")
@@ -1686,6 +1706,7 @@ async function iniciarSessaoPalco() {
   })
 
   alert("Sessão de palco iniciada.")
+}
 }
 
 if (carregandoLogin) {
@@ -1759,23 +1780,15 @@ function entrarNaSessaoAoVivo() {
     return
   }
 
-  const nomesMusicas = sessaoPalco.musicas || []
+  const lista = sessaoPalco.musicas || []
+  const indice = sessaoPalco.indiceMusica || 0
 
-  const lista = nomesMusicas.map((nomeMusica) => {
-    const dadosMusica = musicas.find((m) => m.nome === nomeMusica)
-
-    return (
-      dadosMusica || {
-        nome: nomeMusica,
-        tom: "",
-        letra: "",
-        cifra: "",
-        tags: [],
-        favorito: false,
-        execucoes: 0
-      }
-    )
-  })
+  setListaPalco(lista)
+  setIndiceMusicaPalco(indice)
+  setMusicaPalco(lista[indice])
+  setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
+  setModoPalcoAberto(true)
+}
 
   const indice = sessaoPalco.indiceMusica || 0
 
@@ -1785,6 +1798,66 @@ function entrarNaSessaoAoVivo() {
   setModoPalcoVisualizacao(sessaoPalco.modo || "letra")
   setModoPalcoAberto(true)
 }
+async function atualizarSessaoPalco(novosDados) {
+  if (!podeControlarPalco) return
+
+  await setDoc(
+    doc(db, "palco", "sessaoAtual"),
+    {
+      ...sessaoPalco,
+      ...novosDados,
+      atualizadoEm: new Date().toISOString()
+    },
+    { merge: true }
+  )
+}
+
+async function proximaMusicaAoVivo() {
+  if (!sessaoPalco?.ativo) return
+
+  const total = sessaoPalco.musicas?.length || 0
+  if (total === 0) return
+
+  const novoIndice =
+    sessaoPalco.indiceMusica >= total - 1
+      ? 0
+      : sessaoPalco.indiceMusica + 1
+
+  await atualizarSessaoPalco({
+    indiceMusica: novoIndice
+  })
+}
+
+async function musicaAnteriorAoVivo() {
+  if (!sessaoPalco?.ativo) return
+
+  const total = sessaoPalco.musicas?.length || 0
+  if (total === 0) return
+
+  const novoIndice =
+    sessaoPalco.indiceMusica <= 0
+      ? total - 1
+      : sessaoPalco.indiceMusica - 1
+
+  await atualizarSessaoPalco({
+    indiceMusica: novoIndice
+  })
+}
+
+async function enviarMensagemHost() {
+  await atualizarSessaoPalco({
+    mensagemHost
+  })
+}
+
+async function limparMensagemHost() {
+  setMensagemHost("")
+  await atualizarSessaoPalco({
+    mensagemHost: ""
+  })
+}
+
+
 
 
 
@@ -1928,6 +2001,38 @@ function entrarNaSessaoAoVivo() {
 
               <button onClick={proximaMusicaPalco}>Próxima ▶</button>
             </div>
+            {podeControlarPalco && sessaoPalco?.ativo && (
+  <div className="stage-host-panel">
+    <h3>🎛 Controle do Host</h3>
+
+    <div className="stage-navigation">
+      <button onClick={musicaAnteriorAoVivo}>◀ Ao vivo</button>
+      <button onClick={proximaMusicaAoVivo}>Ao vivo ▶</button>
+    </div>
+
+    <div className="stage-message-box">
+      <input
+        value={mensagemHost}
+        onChange={(e) => setMensagemHost(e.target.value)}
+        placeholder="Mensagem para a banda"
+      />
+
+      <button onClick={enviarMensagemHost}>
+        Enviar
+      </button>
+
+      <button onClick={limparMensagemHost}>
+        Limpar
+      </button>
+    </div>
+  </div>
+)}
+
+{sessaoPalco?.mensagemHost && (
+  <div className="stage-host-message">
+    {sessaoPalco.mensagemHost}
+  </div>
+)}
 
             {listaPalco[indiceMusicaPalco + 1] && (
               <div className="stage-next">
