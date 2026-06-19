@@ -1761,7 +1761,17 @@ useEffect(() => {
   setRolagemAtiva(Boolean(sessaoPalco.rolagemAtiva))
   setVelocidadeRolagem(sessaoPalco.velocidadeRolagem || 1)
 }, [sessaoPalco, modoPalcoAberto])
+useEffect(() => {
+  if (!modoPalcoAberto || !sessaoPalco?.comandoRolagem) return
 
+  const palco = document.querySelector(".stage-mode")
+  if (!palco) return
+
+  palco.scrollBy({
+    top: sessaoPalco.comandoRolagem.direcao,
+    behavior: "smooth"
+  })
+}, [sessaoPalco?.comandoRolagem, modoPalcoAberto])
 
 
 if (carregandoLogin) {
@@ -1923,7 +1933,23 @@ async function limparMensagemHost() {
     mensagemHost: ""
   })
 }
+async function moverRolagemAoVivo(valor) {
+  const novoComando = {
+    direcao: valor,
+    momento: Date.now()
+  }
 
+  if (podeControlarPalco && sessaoPalco?.ativo) {
+    await atualizarSessaoPalco({
+      comandoRolagem: novoComando
+    })
+  }
+
+  const palco = document.querySelector(".stage-mode")
+  if (palco) {
+    palco.scrollBy({ top: valor, behavior: "smooth" })
+  }
+}
 
 
 
@@ -2090,14 +2116,28 @@ async function limparMensagemHost() {
 {podeControlarPalco && sessaoPalco?.ativo && (
   <div className="stage-host-panel">
     <h3>🎛 Controle do Host</h3>
-    <div className="stage-navigation">
-  <button onClick={() => document.querySelector(".stage-mode")?.scrollBy({ top: -300, behavior: "smooth" })}>
-    ⬆ Subir
+  <div className="stage-navigation">
+  <button onClick={musicaAnteriorAoVivo}>◀ Música</button>
+  <button onClick={proximaMusicaAoVivo}>Música ▶</button>
+</div>
+
+<div className="stage-navigation">
+  <button onClick={() => atualizarSessaoPalco({ modo: "letra" })}>
+    👁️ Letra
   </button>
 
-  <button onClick={() => document.querySelector(".stage-mode")?.scrollBy({ top: 300, behavior: "smooth" })}>
-    ⬇ Descer
+  <button onClick={() => atualizarSessaoPalco({ modo: "cifra" })}>
+    🎸 Cifra
   </button>
+</div>  
+    <div className="stage-navigation">
+ <button onClick={() => moverRolagemAoVivo(-300)}>
+  ⬆ Subir
+</button>
+
+<button onClick={() => moverRolagemAoVivo(300)}>
+  ⬇ Descer
+</button>
 </div>
 <div className="stage-controls">
 
