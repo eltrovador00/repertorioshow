@@ -2019,13 +2019,29 @@ async function limparMensagemHost() {
             {musicaPalco.tom && <h2>Tom: {musicaPalco.tom}</h2>}
 
             <div className="stage-view-toggle">
-              <button onClick={() => setModoPalcoVisualizacao("letra")}>
-                👁️ Letra
-              </button>
+              <button
+  onClick={() => {
+    setModoPalcoVisualizacao("letra")
 
-              <button onClick={() => setModoPalcoVisualizacao("cifra")}>
-                🎸 Cifra
-              </button>
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+      atualizarSessaoPalco({ modo: "letra" })
+    }
+  }}
+>
+  👁️ Letra
+</button>
+
+<button
+  onClick={() => {
+    setModoPalcoVisualizacao("cifra")
+
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+      atualizarSessaoPalco({ modo: "cifra" })
+    }
+  }}
+>
+  🎸 Cifra
+</button>
             </div>
 
             <pre
@@ -2127,11 +2143,12 @@ async function limparMensagemHost() {
     <h3>🎛 Controle do Host</h3>
 
     <div className="stage-message-box">
-      <input
-        value={mensagemHost}
-        onChange={(e) => setMensagemHost(e.target.value)}
-        placeholder="Mensagem para a banda"
-      />
+      <textarea
+  value={mensagemHost}
+  onChange={(e) => setMensagemHost(e.target.value)}
+  onKeyDown={(e) => e.stopPropagation()}
+  placeholder="Mensagem para a banda"
+/>
 
       <button onClick={enviarMensagemHost}>
         Enviar
