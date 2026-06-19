@@ -2054,58 +2054,7 @@ async function limparMensagemHost() {
                 : musicaPalco.cifra || "Nenhuma cifra cadastrada."}
             </pre>
 
-            <div className="stage-controls">
-              <button
-  onClick={() => {
-    const novoEstado = !rolagemAtiva
-
-    setRolagemAtiva(novoEstado)
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-      atualizarSessaoPalco({
-        rolagemAtiva: novoEstado,
-        velocidadeRolagem
-      })
-    }
-  }}
->
-  {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
-</button>
-
-              <button
-  onClick={() => {
-    const novaVelocidade = Math.max(1, velocidadeRolagem - 1)
-
-    setVelocidadeRolagem(novaVelocidade)
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-      atualizarSessaoPalco({
-        velocidadeRolagem: novaVelocidade
-      })
-    }
-  }}
->
-  ➖
-</button>
-
-<span>Velocidade: {velocidadeRolagem}</span>
-
-<button
-  onClick={() => {
-    const novaVelocidade = velocidadeRolagem + 1
-
-    setVelocidadeRolagem(novaVelocidade)
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-      atualizarSessaoPalco({
-        velocidadeRolagem: novaVelocidade
-      })
-    }
-  }}
->
-  ➕
-</button>
-           </div>
+            
 
 <div className="stage-shortcuts">
   ⬅️ Anterior | ➡️ Próxima | Espaço = Pausar | + = Mais rápido | - =
@@ -2141,7 +2090,118 @@ async function limparMensagemHost() {
 {podeControlarPalco && sessaoPalco?.ativo && (
   <div className="stage-host-panel">
     <h3>🎛 Controle do Host</h3>
+    <div className="stage-navigation">
+  <button onClick={() => document.querySelector(".stage-mode")?.scrollBy({ top: -300, behavior: "smooth" })}>
+    ⬆ Subir
+  </button>
 
+  <button onClick={() => document.querySelector(".stage-mode")?.scrollBy({ top: 300, behavior: "smooth" })}>
+    ⬇ Descer
+  </button>
+</div>
+<div className="stage-controls">
+
+              <button
+
+  onClick={() => {
+
+    const novoEstado = !rolagemAtiva
+
+
+
+    setRolagemAtiva(novoEstado)
+
+
+
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+
+      atualizarSessaoPalco({
+
+        rolagemAtiva: novoEstado,
+
+        velocidadeRolagem
+
+      })
+
+    }
+
+  }}
+
+>
+
+  {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
+
+</button>
+
+
+
+              <button
+
+  onClick={() => {
+
+    const novaVelocidade = Math.max(1, velocidadeRolagem - 1)
+
+
+
+    setVelocidadeRolagem(novaVelocidade)
+
+
+
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+
+      atualizarSessaoPalco({
+
+        velocidadeRolagem: novaVelocidade
+
+      })
+
+    }
+
+  }}
+
+>
+
+  ➖
+
+</button>
+
+
+
+<span>Velocidade: {velocidadeRolagem}</span>
+
+
+
+<button
+
+  onClick={() => {
+
+    const novaVelocidade = velocidadeRolagem + 1
+
+
+
+    setVelocidadeRolagem(novaVelocidade)
+
+
+
+    if (podeControlarPalco && sessaoPalco?.ativo) {
+
+      atualizarSessaoPalco({
+
+        velocidadeRolagem: novaVelocidade
+
+      })
+
+    }
+
+  }}
+
+>
+
+  ➕
+
+</button>
+
+           </div>
     <div className="stage-message-box">
       <textarea
   value={mensagemHost}
@@ -2158,6 +2218,7 @@ async function limparMensagemHost() {
         Limpar
       </button>
     </div>
+    
   </div>
 )}
 
