@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import jsPDF from "jspdf"
 import "./App.css"
+import { QRCodeSVG } from "qrcode.react"
 import logoArcanjos from "./assets/logo.jpeg"
 import {
   BarChart,
@@ -232,7 +233,6 @@ function App() {
           { nome: "Sofrência", cor: "orange", musicas: [] }
         ]
   })
-
   const [novaMusica, setNovaMusica] = useState("")
   const [busca, setBusca] = useState("")
   const [blocoSelecionado, setBlocoSelecionado] = useState("Abertura")
@@ -293,6 +293,7 @@ const [mensagemHost, setMensagemHost] = useState("")
   const [letraMusicaEditando, setLetraMusicaEditando] = useState("")
   const [cifraMusicaEditando, setCifraMusicaEditando] = useState("")
   const [tagsMusicaEditando, setTagsMusicaEditando] = useState("")
+  const [tamanhoFontePalco, setTamanhoFontePalco] = useState(32)
   const [eventos, setEventos] = useState(() => {
   const dados = localStorage.getItem("eventos")
   return dados ? JSON.parse(dados) : []
@@ -1752,6 +1753,7 @@ async function iniciarSessaoPalco() {
     mensagemHost: "",
     rolagemAtiva: false,
     velocidadeRolagem: velocidadeRolagem || 1,
+    tamanhoFontePalco: tamanhoFontePalco || 32,
     host: perfilUsuario?.nome || usuario.email,
     ativo: true,
     atualizadoEm: new Date().toISOString()
@@ -1765,21 +1767,8 @@ useEffect(() => {
 
   setRolagemAtiva(Boolean(sessaoPalco.rolagemAtiva))
   setVelocidadeRolagem(sessaoPalco.velocidadeRolagem || 1)
+  setTamanhoFontePalco(sessaoPalco.tamanhoFontePalco || 32)
 }, [sessaoPalco, modoPalcoAberto])
-useEffect(() => {
-  if (!modoPalcoAberto) return
-  if (!sessaoPalco?.comandoRolagem?.momento) return
-
-  const palco = palcoRef.current
-  if (!palco) return
-
-  palco.scrollBy({
-    top: Number(sessaoPalco.comandoRolagem.direcao || 0),
-    behavior: "smooth"
-  })
-}, [sessaoPalco?.comandoRolagem?.momento, modoPalcoAberto])
-
-
 useEffect(() => {
   if (!modoPalcoAberto) return
   if (!sessaoPalco?.comandoRolagem?.id) return
@@ -1946,29 +1935,12 @@ async function limparMensagemHost() {
     mensagemHost: ""
   })
 }
-async function moverRolagemAoVivo(valor) {
-  if (!podeControlarPalco || !sessaoPalco?.ativo) return
-
-  await atualizarSessaoPalco({
-    comandoRolagem: {
-      direcao: valor,
-      momento: Date.now()
-    }
-  })
-}
 function executarRolagemPalco(valor) {
-  const palco = document.querySelector(".stage-mode")
-  const conteudo = document.querySelector(".stage-content")
+  const palco = palcoRef.current || document.querySelector(".stage-mode")
 
   if (palco) {
     palco.scrollBy({ top: valor, behavior: "smooth" })
   }
-
-  if (conteudo) {
-    conteudo.scrollBy({ top: valor, behavior: "smooth" })
-  }
-
-  window.scrollBy({ top: valor, behavior: "smooth" })
 }
 
 async function moverRolagemAoVivo(valor) {
@@ -2081,41 +2053,44 @@ async function moverRolagemAoVivo(valor) {
 
             <div className="stage-view-toggle">
               <button
-  onClick={() => {
-    setModoPalcoVisualizacao("letra")
+                onClick={() => {
+                  setModoPalcoVisualizacao("letra")
 
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-      atualizarSessaoPalco({ modo: "letra" })
-    }
-  }}
->
-  👁️ Letra
-</button>
+                  if (podeControlarPalco && sessaoPalco?.ativo) {
+                    atualizarSessaoPalco({ modo: "letra" })
+                  }
+                }}
+              >
+                👁️ Letra
+              </button>
 
-<button
-  onClick={() => {
-    setModoPalcoVisualizacao("cifra")
+              <button
+                onClick={() => {
+                  setModoPalcoVisualizacao("cifra")
 
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-      atualizarSessaoPalco({ modo: "cifra" })
-    }
-  }}
->
-  🎸 Cifra
-</button>
+                  if (podeControlarPalco && sessaoPalco?.ativo) {
+                    atualizarSessaoPalco({ modo: "cifra" })
+                  }
+                }}
+              >
+                🎸 Cifra
+              </button>
             </div>
 
             <pre
               className={
-                modoPalcoVisualizacao === "cifra" ? "stage-chords" : ""
+                modoPalcoVisualizacao === "cifra"
+                  ? "stage-chords"
+                  : ""
               }
+              style={{
+                fontSize: `${tamanhoFontePalco}px`
+              }}
             >
               {modoPalcoVisualizacao === "letra"
                 ? musicaPalco.letra || "Nenhuma letra cadastrada."
                 : musicaPalco.cifra || "Nenhuma cifra cadastrada."}
             </pre>
-
-            
 
 <div className="stage-shortcuts">
   ⬅️ Anterior | ➡️ Próxima | Espaço = Pausar | + = Mais rápido | - =
@@ -2151,6 +2126,47 @@ async function moverRolagemAoVivo(valor) {
 {podeControlarPalco && sessaoPalco?.ativo && (
   <div className="stage-host-panel">
     <h3>🎛 Controle do Host</h3>
+    <div className="stage-navigation">
+  <button
+    onClick={() => {
+      const novo = Math.max(18, tamanhoFontePalco - 2)
+
+      setTamanhoFontePalco(novo)
+
+      atualizarSessaoPalco({
+        tamanhoFontePalco: novo
+      })
+    }}
+  >
+    A-
+  </button>
+
+  <span>{tamanhoFontePalco}px</span>
+
+  <button
+    onClick={() => {
+      const novo = Math.min(80, tamanhoFontePalco + 2)
+
+      setTamanhoFontePalco(novo)
+
+      atualizarSessaoPalco({
+        tamanhoFontePalco: novo
+      })
+    }}
+  >
+    A+
+  </button>
+</div>
+    <div className="stage-qr-box">
+  <QRCodeSVG
+    value="https://repertorioshow.vercel.app"
+    size={140}
+    bgColor="#ffffff"
+    fgColor="#111827"
+  />
+
+  <p>Escaneie para entrar no palco</p>
+</div>
   <div className="stage-navigation">
   <button onClick={musicaAnteriorAoVivo}>◀ Música</button>
   <button onClick={proximaMusicaAoVivo}>Música ▶</button>
@@ -2175,78 +2191,56 @@ async function moverRolagemAoVivo(valor) {
 </button>
 </div>
 <div className="stage-controls">
+  <button
+    onClick={() => {
+      const novoEstado = !rolagemAtiva
 
-               {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
+      setRolagemAtiva(novoEstado)
 
+      if (podeControlarPalco && sessaoPalco?.ativo) {
+        atualizarSessaoPalco({
+          rolagemAtiva: novoEstado
+        })
+      }
+    }}
+  >
+    {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
+  </button>
 
+  <button
+    onClick={() => {
+      const novaVelocidade = Math.max(1, velocidadeRolagem - 1)
 
-              <button
+      setVelocidadeRolagem(novaVelocidade)
 
-  onClick={() => {
+      if (podeControlarPalco && sessaoPalco?.ativo) {
+        atualizarSessaoPalco({
+          velocidadeRolagem: novaVelocidade
+        })
+      }
+    }}
+  >
+    ➖
+  </button>
 
-    const novaVelocidade = Math.max(1, velocidadeRolagem - 1)
+  <span>Velocidade: {velocidadeRolagem}</span>
 
+  <button
+    onClick={() => {
+      const novaVelocidade = velocidadeRolagem + 1
 
+      setVelocidadeRolagem(novaVelocidade)
 
-    setVelocidadeRolagem(novaVelocidade)
-
-
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-
-      atualizarSessaoPalco({
-
-        velocidadeRolagem: novaVelocidade
-
-      })
-
-    }
-
-  }}
-
->
-
-  ➖
-
-</button>
-
-
-
-<span>Velocidade: {velocidadeRolagem}</span>
-
-
-
-<button
-
-  onClick={() => {
-
-    const novaVelocidade = velocidadeRolagem + 1
-
-
-
-    setVelocidadeRolagem(novaVelocidade)
-
-
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-
-      atualizarSessaoPalco({
-
-        velocidadeRolagem: novaVelocidade
-
-      })
-
-    }
-
-  }}
-
->
-
-  ➕
-
-</button>
-
-           </div>
+      if (podeControlarPalco && sessaoPalco?.ativo) {
+        atualizarSessaoPalco({
+          velocidadeRolagem: novaVelocidade
+        })
+      }
+    }}
+  >
+    ➕
+  </button>
+</div>
     <div className="stage-message-box">
       <textarea
   value={mensagemHost}
@@ -2275,6 +2269,7 @@ async function moverRolagemAoVivo(valor) {
           </div>
         </div>
       )}
+
 {modalEventoAberto && (
   <div className="modal-overlay">
     <div className="modal" style={{ width: "520px" }}>
@@ -3335,5 +3330,4 @@ async function moverRolagemAoVivo(valor) {
     </div>
   )
 }
-
 export default App

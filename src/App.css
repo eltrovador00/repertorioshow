@@ -1126,3 +1126,17 @@ body.stage-open {
 .stage-host-panel button {
   min-height: 40px;
 }
+.stage-qr-box {
+  background: white;
+  color: #111827;
+  padding: 12px;
+  border-radius: 14px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.stage-qr-box p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: bold;
+}
