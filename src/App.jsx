@@ -2702,19 +2702,23 @@ async function moverRolagemAoVivo(valor) {
             </button>
           )}
 
-          <button className="btn-light" onClick={exportarBackupJSON}>
-            Backup JSON
-          </button>
+          {podeEditar && (
+  <>
+    <button className="btn-light" onClick={exportarBackupJSON}>
+      Backup JSON
+    </button>
 
-          <label className="btn-light" style={{ cursor: "pointer" }}>
-            Restaurar JSON
-            <input
-              type="file"
-              accept="application/json"
-              onChange={importarBackupJSON}
-              style={{ display: "none" }}
-            />
-          </label>
+    <label className="btn-light" style={{ cursor: "pointer" }}>
+      Restaurar JSON
+      <input
+        type="file"
+        accept="application/json"
+        onChange={importarBackupJSON}
+        style={{ display: "none" }}
+      />
+    </label>
+  </>
+)}
         </div>
 
         <div className="stats">
