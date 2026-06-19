@@ -2176,37 +2176,7 @@ async function moverRolagemAoVivo(valor) {
 </div>
 <div className="stage-controls">
 
-              <button
-
-  onClick={() => {
-
-    const novoEstado = !rolagemAtiva
-
-
-
-    setRolagemAtiva(novoEstado)
-
-
-
-    if (podeControlarPalco && sessaoPalco?.ativo) {
-
-      atualizarSessaoPalco({
-
-        rolagemAtiva: novoEstado,
-
-        velocidadeRolagem
-
-      })
-
-    }
-
-  }}
-
->
-
-  {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
-
-</button>
+               {rolagemAtiva ? "⏸ Pausar" : "▶ Iniciar"}
 
 
 
