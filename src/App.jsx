@@ -1776,6 +1776,14 @@ useEffect(() => {
   executarRolagemPalco(sessaoPalco.comandoRolagem.direcao)
 }, [sessaoPalco?.comandoRolagem?.id])
 
+useEffect(() => {
+  if (!modoPalcoAberto) return
+  if (!sessaoPalco?.tamanhoFontePalco) return
+
+  setTamanhoFontePalco(sessaoPalco.tamanhoFontePalco)
+}, [sessaoPalco?.tamanhoFontePalco, modoPalcoAberto])
+
+
 if (carregandoLogin) {
   return <div className="login-page">Carregando...</div>
 }
