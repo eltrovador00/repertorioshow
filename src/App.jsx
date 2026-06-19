@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import jsPDF from "jspdf"
 import "./App.css"
 import logoArcanjos from "./assets/logo.jpeg"
@@ -203,6 +203,7 @@ function transporCifra(cifra, passos) {
 }
 
 function App() {
+  const palcoRef = useRef(null)
   const [musicas, setMusicas] = useState(() => {
     const dados = localStorage.getItem("musicas")
 
@@ -426,30 +427,34 @@ const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false)
       document.documentElement.classList.remove("stage-open")
     }
   }, [modoPalcoAberto])
-
   useEffect(() => {
-  if (!modoPalcoAberto) return
-  if (!rolagemAtiva) return
+    if (!modoPalcoAberto) return
+    if (!rolagemAtiva) return
 
-  const palco = document.querySelector(".stage-mode")
+    const palco = palcoRef.current
+    if (!palco) return
 
-  if (!palco) return
+    const intervalo = setInterval(() => {
+      palco.scrollTop += velocidadeRolagem
+    }, 30)
 
-  const intervalo = setInterval(() => {
-    palco.scrollTop += velocidadeRolagem
-  }, 30)
-
-  return () => clearInterval(intervalo)
-}, [
-  rolagemAtiva,
-  velocidadeRolagem,
-  modoPalcoAberto
-])
+    return () => clearInterval(intervalo)
+  }, [rolagemAtiva, velocidadeRolagem, modoPalcoAberto])
 
   useEffect(() => {
     if (!modoPalcoAberto) return
 
     function controlarTeclas(event) {
+      const alvo = event.target
+
+      if (
+        alvo?.tagName === "INPUT" ||
+        alvo?.tagName === "TEXTAREA" ||
+        alvo?.isContentEditable
+      ) {
+        return
+      }
+
       switch (event.key) {
         case "ArrowRight":
           if (sessaoPalco?.ativo && podeControlarPalco) {
@@ -1762,17 +1767,25 @@ useEffect(() => {
   setVelocidadeRolagem(sessaoPalco.velocidadeRolagem || 1)
 }, [sessaoPalco, modoPalcoAberto])
 useEffect(() => {
-  if (!modoPalcoAberto || !sessaoPalco?.comandoRolagem) return
+  if (!modoPalcoAberto) return
+  if (!sessaoPalco?.comandoRolagem?.momento) return
 
-  const palco = document.querySelector(".stage-mode")
+  const palco = palcoRef.current
   if (!palco) return
 
   palco.scrollBy({
-    top: sessaoPalco.comandoRolagem.direcao,
+    top: Number(sessaoPalco.comandoRolagem.direcao || 0),
     behavior: "smooth"
   })
-}, [sessaoPalco?.comandoRolagem, modoPalcoAberto])
+}, [sessaoPalco?.comandoRolagem?.momento, modoPalcoAberto])
 
+
+useEffect(() => {
+  if (!modoPalcoAberto) return
+  if (!sessaoPalco?.comandoRolagem?.id) return
+
+  executarRolagemPalco(sessaoPalco.comandoRolagem.direcao)
+}, [sessaoPalco?.comandoRolagem?.id])
 
 if (carregandoLogin) {
   return <div className="login-page">Carregando...</div>
@@ -1934,23 +1947,42 @@ async function limparMensagemHost() {
   })
 }
 async function moverRolagemAoVivo(valor) {
-  const novoComando = {
-    direcao: valor,
-    momento: Date.now()
-  }
+  if (!podeControlarPalco || !sessaoPalco?.ativo) return
 
-  if (podeControlarPalco && sessaoPalco?.ativo) {
-    await atualizarSessaoPalco({
-      comandoRolagem: novoComando
-    })
-  }
-
+  await atualizarSessaoPalco({
+    comandoRolagem: {
+      direcao: valor,
+      momento: Date.now()
+    }
+  })
+}
+function executarRolagemPalco(valor) {
   const palco = document.querySelector(".stage-mode")
+  const conteudo = document.querySelector(".stage-content")
+
   if (palco) {
     palco.scrollBy({ top: valor, behavior: "smooth" })
   }
+
+  if (conteudo) {
+    conteudo.scrollBy({ top: valor, behavior: "smooth" })
+  }
+
+  window.scrollBy({ top: valor, behavior: "smooth" })
 }
 
+async function moverRolagemAoVivo(valor) {
+  if (!podeControlarPalco || !sessaoPalco?.ativo) return
+
+  await atualizarSessaoPalco({
+    comandoRolagem: {
+      id: `${Date.now()}-${Math.random()}`,
+      direcao: valor
+    }
+  })
+
+  executarRolagemPalco(valor)
+}
 
 
 
@@ -2028,7 +2060,10 @@ async function moverRolagemAoVivo(valor) {
   </div>
 )}
       {modoPalcoAberto && musicaPalco && (
-        <div className="stage-mode">
+        <div
+  className="stage-mode"
+  ref={palcoRef}
+>
           <button className="stage-close" onClick={fecharModoPalco}>
             ×
           </button>
