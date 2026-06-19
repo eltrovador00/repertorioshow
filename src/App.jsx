@@ -293,7 +293,6 @@ const [mensagemHost, setMensagemHost] = useState("")
   const [letraMusicaEditando, setLetraMusicaEditando] = useState("")
   const [cifraMusicaEditando, setCifraMusicaEditando] = useState("")
   const [tagsMusicaEditando, setTagsMusicaEditando] = useState("")
-  const [tamanhoFontePalco, setTamanhoFontePalco] = useState(32)
   const [eventos, setEventos] = useState(() => {
   const dados = localStorage.getItem("eventos")
   return dados ? JSON.parse(dados) : []
@@ -1753,7 +1752,6 @@ async function iniciarSessaoPalco() {
     mensagemHost: "",
     rolagemAtiva: false,
     velocidadeRolagem: velocidadeRolagem || 1,
-    tamanhoFontePalco: tamanhoFontePalco || 32,
     host: perfilUsuario?.nome || usuario.email,
     ativo: true,
     atualizadoEm: new Date().toISOString()
@@ -1767,7 +1765,6 @@ useEffect(() => {
 
   setRolagemAtiva(Boolean(sessaoPalco.rolagemAtiva))
   setVelocidadeRolagem(sessaoPalco.velocidadeRolagem || 1)
-  setTamanhoFontePalco(sessaoPalco.tamanhoFontePalco || 32)
 }, [sessaoPalco, modoPalcoAberto])
 useEffect(() => {
   if (!modoPalcoAberto) return
@@ -1776,12 +1773,6 @@ useEffect(() => {
   executarRolagemPalco(sessaoPalco.comandoRolagem.direcao)
 }, [sessaoPalco?.comandoRolagem?.id])
 
-useEffect(() => {
-  if (!modoPalcoAberto) return
-  if (!sessaoPalco?.tamanhoFontePalco) return
-
-  setTamanhoFontePalco(sessaoPalco.tamanhoFontePalco)
-}, [sessaoPalco?.tamanhoFontePalco, modoPalcoAberto])
 
 
 if (carregandoLogin) {
@@ -2091,9 +2082,6 @@ async function moverRolagemAoVivo(valor) {
                   ? "stage-chords"
                   : ""
               }
-              style={{
-                fontSize: `${tamanhoFontePalco}px`
-              }}
             >
               {modoPalcoVisualizacao === "letra"
                 ? musicaPalco.letra || "Nenhuma letra cadastrada."
@@ -2134,37 +2122,6 @@ async function moverRolagemAoVivo(valor) {
 {podeControlarPalco && sessaoPalco?.ativo && (
   <div className="stage-host-panel">
     <h3>🎛 Controle do Host</h3>
-    <div className="stage-navigation">
-  <button
-    onClick={() => {
-      const novo = Math.max(18, tamanhoFontePalco - 2)
-
-      setTamanhoFontePalco(novo)
-
-      atualizarSessaoPalco({
-        tamanhoFontePalco: novo
-      })
-    }}
-  >
-    A-
-  </button>
-
-  <span>{tamanhoFontePalco}px</span>
-
-  <button
-    onClick={() => {
-      const novo = Math.min(80, tamanhoFontePalco + 2)
-
-      setTamanhoFontePalco(novo)
-
-      atualizarSessaoPalco({
-        tamanhoFontePalco: novo
-      })
-    }}
-  >
-    A+
-  </button>
-</div>
     <div className="stage-qr-box">
   <QRCodeSVG
     value="https://repertorioshow.vercel.app"
